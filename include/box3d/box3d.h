@@ -819,7 +819,8 @@ typedef struct b3BodySnapshot
 	/// b3BodyType
 	int type;
 
-	/// False when the id did not resolve; the rest of the snapshot is then zero
+	/// False when the id did not resolve. The rest of the snapshot is then zeroed, except
+	/// `rotation`, which is set to identity so a consumer never reads a zero quaternion.
 	bool isValid;
 
 	/// True when the body is in the awake set
