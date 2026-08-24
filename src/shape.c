@@ -2480,3 +2480,108 @@ int b3Shape_GetGeometries( const b3ShapeId* shapeIds, int count, b3ShapeGeometry
 	}
 	return count;
 }
+
+static b3ClosestPoint b3ClosestPointToSphereWorld( b3Vec3 center, float radius, b3Vec3 p )
+{
+	b3ClosestPoint r = { 0 };
+	b3Vec3 d = b3Sub( p, center );
+	float len = b3Length( d );
+	b3Vec3 n = len > 1.0e-6f ? b3MulSV( 1.0f / len, d ) : (b3Vec3){ 0.0f, 0.0f, 1.0f };
+	r.normal = n;
+	r.distance = len - radius;
+	r.point = b3MulAdd( center, radius, n );
+	r.isValid = true;
+	return r;
+}
+
+void b3Shape_GetClosestPoints( const b3ShapeId* shapeIds, const b3Pos* points, int count, b3ClosestPoint* results )
+{
+	B3_ASSERT( shapeIds != NULL && points != NULL && results != NULL );
+	for ( int i = 0; i < count; ++i )
+	{
+		b3ClosestPoint* r = results + i;
+		*r = (b3ClosestPoint){ 0 };
+
+		b3ShapeId shapeId = shapeIds[i];
+		if ( b3Shape_IsValid( shapeId ) == false )
+		{
+			continue;
+		}
+
+		b3World* world = b3GetWorld( shapeId.world0 );
+		b3Shape* shape = b3GetShape( world, shapeId );
+		b3Body* body = b3Array_Get( world->bodies, shape->bodyId );
+
+		// Same float carve-out as b3Shape_GetClosestPoint: the query runs relative to the origin.
+		b3Transform xf = b3ToRelativeTransform( b3GetBodyTransformQuick( world, body ), b3Pos_zero );
+		b3Vec3 p = { (float)points[i].x, (float)points[i].y, (float)points[i].z };
+
+		switch ( shape->type )
+		{
+			case b3_sphereShape:
+			{
+				b3Vec3 c = b3TransformPoint( xf, shape->sphere.center );
+				*r = b3ClosestPointToSphereWorld( c, shape->sphere.radius, p );
+				break;
+			}
+
+			case b3_capsuleShape:
+			{
+				b3Vec3 c1 = b3TransformPoint( xf, shape->capsule.center1 );
+				b3Vec3 c2 = b3TransformPoint( xf, shape->capsule.center2 );
+				b3Vec3 e = b3Sub( c2, c1 );
+				float ee = b3Dot( e, e );
+				float t = ee > 0.0f ? b3ClampFloat( b3Dot( b3Sub( p, c1 ), e ) / ee, 0.0f, 1.0f ) : 0.0f;
+				b3Vec3 q = b3MulAdd( c1, t, e );
+				*r = b3ClosestPointToSphereWorld( q, shape->capsule.radius, p );
+				break;
+			}
+
+			case b3_hullShape:
+			{
+				const b3HullData* hull = shape->hull;
+				const b3Plane* planes = b3GetHullPlanes( hull );
+				int planeCount = hull->faceCount;
+				b3Vec3 pl = b3InvTransformPoint( xf, p );
+
+				float maxSep = -FLT_MAX;
+				int maxIndex = 0;
+				for ( int k = 0; k < planeCount; ++k )
+				{
+					float s = b3PlaneSeparation( planes[k], pl );
+					if ( s > maxSep )
+					{
+						maxSep = s;
+						maxIndex = k;
+					}
+				}
+
+				if ( maxSep <= 0.0f )
+				{
+					// inside: the least-penetrated face is the nearest surface
+					b3Vec3 nl = planes[maxIndex].normal;
+					b3Vec3 ql = b3MulAdd( pl, -maxSep, nl );
+					r->point = b3TransformPoint( xf, ql );
+					r->normal = b3RotateVector( xf.q, nl );
+					r->distance = maxSep;
+				}
+				else
+				{
+					// outside: GJK witness from the existing query, normal from the offset
+					b3Vec3 witness = b3Shape_GetClosestPoint( shapeId, p );
+					b3Vec3 d = b3Sub( p, witness );
+					float len = b3Length( d );
+					r->point = witness;
+					r->distance = len;
+					r->normal = len > 1.0e-6f ? b3MulSV( 1.0f / len, d ) : b3RotateVector( xf.q, planes[maxIndex].normal );
+				}
+				r->isValid = true;
+				break;
+			}
+
+			default:
+				// mesh, height field, compound: no point distance query in Box3D
+				break;
+		}
+	}
+}

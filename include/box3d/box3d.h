@@ -851,7 +851,8 @@ typedef struct b3ShapeGeometry
 	/// Valid when type == b3_capsuleShape. Centers are in the body frame.
 	b3Capsule capsule;
 
-	/// World-space axis-aligned bounding box at the time of the call, all types
+	/// World-space axis-aligned bounding box at the time of the call, all types. This is Box3D's
+	/// fat AABB: inflated by B3_SPECULATIVE_DISTANCE on every axis.
 	b3AABB aabb;
 
 	/// Coulomb friction coefficient
@@ -870,6 +871,28 @@ typedef struct b3ShapeGeometry
 /// Fill one geometry record per id. Invalid ids yield isValid == false.
 /// @returns count
 B3_API int b3Shape_GetGeometries( const b3ShapeId* shapeIds, int count, b3ShapeGeometry* geometries );
+
+/// Closest surface point of a shape to a query point, with a signed distance.
+typedef struct b3ClosestPoint
+{
+	/// Closest point on the shape surface, world frame
+	b3Vec3 point;
+
+	/// Outward unit normal at that point, world frame
+	b3Vec3 normal;
+
+	/// Signed distance from the query point to the surface: negative inside the shape
+	float distance;
+
+	/// False for an invalid id, and for mesh, height field and compound shapes, which have no
+	/// point distance query in Box3D (use the mover or overlap queries for those)
+	bool isValid;
+} b3ClosestPoint;
+
+/// For each (shapeId, point) pair compute the closest surface point, outward normal and signed
+/// distance. Sphere, capsule and hull shapes are exact. Results for other shape types have
+/// isValid == false.
+B3_API void b3Shape_GetClosestPoints( const b3ShapeId* shapeIds, const b3Pos* points, int count, b3ClosestPoint* results );
 
 /** @} */ // coupling
 

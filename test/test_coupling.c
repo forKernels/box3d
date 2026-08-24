@@ -163,10 +163,78 @@ static int ShapeGeometriesTest( void )
 	return 0;
 }
 
+static int ClosestPointsTest( void )
+{
+	b3WorldDef worldDef = b3DefaultWorldDef();
+	b3WorldId worldId = b3CreateWorld( &worldDef );
+	b3BodyDef bodyDef = b3DefaultBodyDef();
+	bodyDef.type = b3_dynamicBody;
+	bodyDef.position = (b3Pos){ 10.0, 0.0, 0.0 };
+	b3BodyId bodyId = b3CreateBody( worldId, &bodyDef );
+	b3ShapeDef shapeDef = b3DefaultShapeDef();
+	b3Sphere sphere = { { 0.0f, 1.0f, 0.0f }, 0.5f };
+	b3ShapeId sphereId = b3CreateSphereShape( bodyId, &shapeDef, &sphere );
+	b3Capsule capsule = { { -1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f }, 0.25f };
+	b3ShapeId capsuleId = b3CreateCapsuleShape( bodyId, &shapeDef, &capsule );
+
+	// unit box hull on a second body at the origin -- b3BoxHull is a stack-embedded hull
+	// (see test/test_body_query.c: b3MakeBoxHull + &box.base), no heap alloc/destroy needed
+	b3BodyDef boxDef = b3DefaultBodyDef();
+	boxDef.type = b3_staticBody;
+	b3BodyId boxBody = b3CreateBody( worldId, &boxDef );
+	b3BoxHull boxHull = b3MakeBoxHull( 1.0f, 1.0f, 1.0f );
+	b3ShapeId boxId = b3CreateHullShape( boxBody, &shapeDef, &boxHull.base );
+
+	b3ShapeId ids[6] = { sphereId, sphereId, capsuleId, boxId, boxId, b3_nullShapeId };
+	b3Pos pts[6] = {
+		{ 10.0, 1.0, 2.0 },   // sphere, outside: world center (10,1,0), r 0.5 -> d 1.5
+		{ 10.0, 1.0, 0.2 },   // sphere, inside: d -0.3
+		{ 10.5, 0.75, 0.0 },  // capsule: segment (9,0,0)-(11,0,0), r 0.25 -> d 0.5, normal +y
+		{ 0.0, 0.0, 2.0 },	  // box, outside: d 1, normal +z, point (0,0,1)
+		{ 0.0, 0.0, 0.5 },	  // box, inside: d -0.5, normal +z, point (0,0,1)
+		{ 0.0, 0.0, 0.0 },	  // invalid id
+	};
+	b3ClosestPoint r[6];
+	b3Shape_GetClosestPoints( ids, pts, 6, r );
+
+	ENSURE( r[0].isValid );
+	ENSURE_SMALL( r[0].distance - 1.5f, 1e-5f );
+	ENSURE_SMALL( r[0].normal.z - 1.0f, 1e-5f );
+	ENSURE_SMALL( r[0].point.z - 0.5f, 1e-5f );
+	ENSURE_SMALL( r[0].point.x - 10.0f, 1e-4f );
+
+	ENSURE( r[1].isValid );
+	ENSURE_SMALL( r[1].distance + 0.3f, 1e-5f );
+	ENSURE_SMALL( r[1].normal.z - 1.0f, 1e-5f );
+	ENSURE_SMALL( r[1].point.z - 0.5f, 1e-5f );
+
+	ENSURE( r[2].isValid );
+	ENSURE_SMALL( r[2].distance - 0.5f, 1e-5f );
+	ENSURE_SMALL( r[2].normal.y - 1.0f, 1e-5f );
+	ENSURE_SMALL( r[2].point.y - 0.25f, 1e-5f );
+	ENSURE_SMALL( r[2].point.x - 10.5f, 1e-4f );
+
+	ENSURE( r[3].isValid );
+	ENSURE_SMALL( r[3].distance - 1.0f, 1e-4f );
+	ENSURE_SMALL( r[3].normal.z - 1.0f, 1e-4f );
+	ENSURE_SMALL( r[3].point.z - 1.0f, 1e-4f );
+
+	ENSURE( r[4].isValid );
+	ENSURE_SMALL( r[4].distance + 0.5f, 1e-5f );
+	ENSURE_SMALL( r[4].normal.z - 1.0f, 1e-5f );
+	ENSURE_SMALL( r[4].point.z - 1.0f, 1e-5f );
+
+	ENSURE( r[5].isValid == false );
+
+	b3DestroyWorld( worldId );
+	return 0;
+}
+
 int CouplingTest( void )
 {
 	RUN_SUBTEST( BodySnapshotsTest );
 	RUN_SUBTEST( BodyImpulsesTest );
 	RUN_SUBTEST( ShapeGeometriesTest );
+	RUN_SUBTEST( ClosestPointsTest );
 	return 0;
 }
