@@ -118,9 +118,55 @@ static int BodyImpulsesTest( void )
 	return 0;
 }
 
+static int ShapeGeometriesTest( void )
+{
+	b3WorldDef worldDef = b3DefaultWorldDef();
+	b3WorldId worldId = b3CreateWorld( &worldDef );
+	b3BodyDef bodyDef = b3DefaultBodyDef();
+	bodyDef.type = b3_dynamicBody;
+	bodyDef.position = (b3Pos){ 10.0, 0.0, 0.0 };
+	b3BodyId bodyId = b3CreateBody( worldId, &bodyDef );
+	b3ShapeDef shapeDef = b3DefaultShapeDef();
+	shapeDef.baseMaterial.friction = 0.7f;
+	shapeDef.baseMaterial.restitution = 0.25f;
+	b3Sphere sphere = { { 0.0f, 1.0f, 0.0f }, 0.5f };
+	b3ShapeId sphereId = b3CreateSphereShape( bodyId, &shapeDef, &sphere );
+	b3Capsule capsule = { { -1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f }, 0.25f };
+	b3ShapeId capsuleId = b3CreateCapsuleShape( bodyId, &shapeDef, &capsule );
+
+	b3ShapeId ids[3] = { sphereId, capsuleId, b3_nullShapeId };
+	b3ShapeGeometry g[3];
+	int n = b3Shape_GetGeometries( ids, 3, g );
+	ENSURE( n == 3 );
+
+	ENSURE( g[0].isValid && g[0].type == b3_sphereShape );
+	ENSURE( B3_ID_EQUALS( g[0].bodyId, bodyId ) );
+	ENSURE_SMALL( g[0].sphere.center.y - 1.0f, 1e-6f );
+	ENSURE_SMALL( g[0].sphere.radius - 0.5f, 1e-6f );
+	ENSURE_SMALL( g[0].friction - 0.7f, 1e-6f );
+	ENSURE_SMALL( g[0].restitution - 0.25f, 1e-6f );
+	ENSURE( g[0].isSensor == false );
+	// world AABB: body at x=10, sphere center y=1, r=0.5 -> tight bounds x in [9.5,10.5], y in [0.5,1.5].
+	// b3Shape_GetAABB() returns shape->aabb, which b3ComputeFatShapeAABB() inflates by
+	// B3_SPECULATIVE_DISTANCE on every axis (see shape.c), so account for that fixed margin.
+	ENSURE_SMALL( g[0].aabb.lowerBound.x - ( 9.5f - B3_SPECULATIVE_DISTANCE ), 1e-4f );
+	ENSURE_SMALL( g[0].aabb.upperBound.y - ( 1.5f + B3_SPECULATIVE_DISTANCE ), 1e-4f );
+
+	ENSURE( g[1].isValid && g[1].type == b3_capsuleShape );
+	ENSURE_SMALL( g[1].capsule.center1.x + 1.0f, 1e-6f );
+	ENSURE_SMALL( g[1].capsule.center2.x - 1.0f, 1e-6f );
+	ENSURE_SMALL( g[1].capsule.radius - 0.25f, 1e-6f );
+
+	ENSURE( g[2].isValid == false );
+
+	b3DestroyWorld( worldId );
+	return 0;
+}
+
 int CouplingTest( void )
 {
 	RUN_SUBTEST( BodySnapshotsTest );
 	RUN_SUBTEST( BodyImpulsesTest );
+	RUN_SUBTEST( ShapeGeometriesTest );
 	return 0;
 }

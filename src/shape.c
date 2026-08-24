@@ -2444,3 +2444,39 @@ uint64_t b3GetShapeUserMaterialId( const b3Shape* shape, int childIndex, int tri
 	materialIndex = b3ClampInt( materialIndex, 0, shape->materialCount - 1 );
 	return b3GetShapeMaterials( shape )[materialIndex].userMaterialId;
 }
+
+// ── Coupling API ─────────────────────────────────────────────────────────────
+
+int b3Shape_GetGeometries( const b3ShapeId* shapeIds, int count, b3ShapeGeometry* geometries )
+{
+	B3_ASSERT( shapeIds != NULL && geometries != NULL );
+	for ( int i = 0; i < count; ++i )
+	{
+		b3ShapeGeometry* g = geometries + i;
+		*g = (b3ShapeGeometry){ 0 };
+		g->bodyId = b3_nullBodyId;
+
+		b3ShapeId shapeId = shapeIds[i];
+		if ( b3Shape_IsValid( shapeId ) == false )
+		{
+			continue;
+		}
+
+		g->type = b3Shape_GetType( shapeId );
+		g->bodyId = b3Shape_GetBody( shapeId );
+		if ( g->type == b3_sphereShape )
+		{
+			g->sphere = b3Shape_GetSphere( shapeId );
+		}
+		else if ( g->type == b3_capsuleShape )
+		{
+			g->capsule = b3Shape_GetCapsule( shapeId );
+		}
+		g->aabb = b3Shape_GetAABB( shapeId );
+		g->friction = b3Shape_GetFriction( shapeId );
+		g->restitution = b3Shape_GetRestitution( shapeId );
+		g->isSensor = b3Shape_IsSensor( shapeId );
+		g->isValid = true;
+	}
+	return count;
+}

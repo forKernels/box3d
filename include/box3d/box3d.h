@@ -836,7 +836,42 @@ B3_API int b3Body_GetSnapshots( const b3BodyId* bodyIds, int count, b3BodySnapsh
 B3_API void b3Body_ApplyImpulses( const b3BodyId* bodyIds, int count, const b3Vec3* linearImpulses,
 								   const b3Vec3* angularImpulses, bool wake );
 
-/** @} */
+/// Geometry and material an external collider needs from a shape.
+typedef struct b3ShapeGeometry
+{
+	/// b3ShapeType
+	b3ShapeType type;
+
+	/// The body this shape is attached to
+	b3BodyId bodyId;
+
+	/// Valid when type == b3_sphereShape. Center is in the body frame.
+	b3Sphere sphere;
+
+	/// Valid when type == b3_capsuleShape. Centers are in the body frame.
+	b3Capsule capsule;
+
+	/// World-space axis-aligned bounding box at the time of the call, all types
+	b3AABB aabb;
+
+	/// Coulomb friction coefficient
+	float friction;
+
+	/// Restitution coefficient
+	float restitution;
+
+	/// True for sensor shapes (they do not collide)
+	bool isSensor;
+
+	/// False when the id did not resolve; the rest of the struct is then zero
+	bool isValid;
+} b3ShapeGeometry;
+
+/// Fill one geometry record per id. Invalid ids yield isValid == false.
+/// @returns count
+B3_API int b3Shape_GetGeometries( const b3ShapeId* shapeIds, int count, b3ShapeGeometry* geometries );
+
+/** @} */ // coupling
 
 /**
  * @defgroup shape Shape
