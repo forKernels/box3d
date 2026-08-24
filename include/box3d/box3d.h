@@ -782,6 +782,63 @@ B3_API int b3Body_CollideMover( b3BodyId bodyId, b3BodyPlaneResult* bodyPlanes, 
 /** @} */ // body
 
 /**
+ * @defgroup coupling Coupling
+ * Batch access to body state and shapes for external solvers (particles, cloth, soft bodies)
+ * that need to read Box3D bodies and push impulses back. All functions take id arrays so a
+ * caller with N bodies makes one call, not N.
+ * @{
+ */
+
+/// Snapshot of the state an external solver needs from a body.
+typedef struct b3BodySnapshot
+{
+	/// Body origin, world frame (double precision, large-world safe)
+	b3Pos origin;
+
+	/// Body rotation, xyzw
+	b3Quat rotation;
+
+	/// Center of mass in the body frame
+	b3Vec3 localCenter;
+
+	/// Velocity of the center of mass, world frame
+	b3Vec3 linearVelocity;
+
+	/// Angular velocity, world frame
+	b3Vec3 angularVelocity;
+
+	/// Inverse mass, zero for static and kinematic bodies
+	float invMass;
+
+	/// Rotational inertia about the center of mass, body frame; zero for static and kinematic bodies
+	b3Matrix3 localInertia;
+
+	/// Inverse of localInertia; zero for static and kinematic bodies
+	b3Matrix3 localInvInertia;
+
+	/// b3BodyType
+	int type;
+
+	/// False when the id did not resolve; the rest of the snapshot is then zero
+	bool isValid;
+
+	/// True when the body is in the awake set
+	bool isAwake;
+} b3BodySnapshot;
+
+/// Fill one snapshot per id. Invalid ids yield isValid == false and a zeroed snapshot.
+/// @returns count
+B3_API int b3Body_GetSnapshots( const b3BodyId* bodyIds, int count, b3BodySnapshot* snapshots );
+
+/// Apply one linear impulse (at the center of mass) and one angular impulse (about it), world
+/// frame, per id. Either array may be NULL and is then treated as zero. Static and kinematic
+/// bodies and invalid ids are skipped.
+B3_API void b3Body_ApplyImpulses( const b3BodyId* bodyIds, int count, const b3Vec3* linearImpulses,
+								   const b3Vec3* angularImpulses, bool wake );
+
+/** @} */
+
+/**
  * @defgroup shape Shape
  * Functions to create, destroy, and access.
  * Shapes bind raw geometry to bodies and hold material properties including friction and restitution.

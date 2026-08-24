@@ -2481,3 +2481,74 @@ bool b3ShouldBodiesCollide( b3World* world, b3Body* bodyA, b3Body* bodyB )
 
 	return true;
 }
+
+// ── Coupling API ─────────────────────────────────────────────────────────────
+
+int b3Body_GetSnapshots( const b3BodyId* bodyIds, int count, b3BodySnapshot* snapshots )
+{
+	B3_ASSERT( bodyIds != NULL && snapshots != NULL );
+	for ( int i = 0; i < count; ++i )
+	{
+		b3BodySnapshot* s = snapshots + i;
+		*s = (b3BodySnapshot){ 0 };
+		s->rotation = b3Quat_identity;
+
+		b3BodyId bodyId = bodyIds[i];
+		if ( b3Body_IsValid( bodyId ) == false )
+		{
+			continue;
+		}
+
+		b3World* world = b3GetWorld( bodyId.world0 );
+		b3Body* body = b3GetBodyFullId( world, bodyId );
+		b3BodySim* sim = b3GetBodySim( world, body );
+
+		s->origin = sim->transform.p;
+		s->rotation = sim->transform.q;
+		s->localCenter = sim->localCenter;
+		s->linearVelocity = b3Body_GetLinearVelocity( bodyId );
+		s->angularVelocity = b3Body_GetAngularVelocity( bodyId );
+		s->invMass = b3Body_GetInverseMass( bodyId );
+		s->localInertia = body->inertia;
+		s->localInvInertia = sim->invInertiaLocal;
+		s->type = (int)body->type;
+		s->isValid = true;
+		s->isAwake = ( body->setIndex == b3_awakeSet );
+
+		if ( body->type != b3_dynamicBody )
+		{
+			// Box3D already stores zero inverse mass / inertia for static and kinematic bodies;
+			// restate it so a consumer never sees a kinematic body as movable.
+			s->invMass = 0.0f;
+			s->localInertia = b3Mat3_zero;
+			s->localInvInertia = b3Mat3_zero;
+		}
+	}
+	return count;
+}
+
+void b3Body_ApplyImpulses( const b3BodyId* bodyIds, int count, const b3Vec3* linearImpulses,
+							const b3Vec3* angularImpulses, bool wake )
+{
+	B3_ASSERT( bodyIds != NULL );
+	for ( int i = 0; i < count; ++i )
+	{
+		b3BodyId bodyId = bodyIds[i];
+		if ( b3Body_IsValid( bodyId ) == false )
+		{
+			continue;
+		}
+		if ( b3Body_GetType( bodyId ) != b3_dynamicBody )
+		{
+			continue;
+		}
+		if ( linearImpulses != NULL )
+		{
+			b3Body_ApplyLinearImpulseToCenter( bodyId, linearImpulses[i], wake );
+		}
+		if ( angularImpulses != NULL )
+		{
+			b3Body_ApplyAngularImpulse( bodyId, angularImpulses[i], wake );
+		}
+	}
+}

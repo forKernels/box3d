@@ -32,6 +32,7 @@ extern int BodyQueryTest( void );
 extern int CollisionTest( void );
 extern int CompoundTest( void );
 extern int ContainerTest( void );
+extern int CouplingTest( void );
 extern int DeterminismTest( void );
 extern int DistanceTest( void );
 extern int HashTest( void );
@@ -106,6 +107,7 @@ int main( int argc, char** argv )
 	MAYBE_RUN_TEST( CollisionTest );
 	MAYBE_RUN_TEST( CompoundTest );
 	MAYBE_RUN_TEST( ContainerTest );
+	MAYBE_RUN_TEST( CouplingTest );
 	MAYBE_RUN_TEST( DeterminismTest );
 	MAYBE_RUN_TEST( DistanceTest );
 	MAYBE_RUN_TEST( HashTest );
